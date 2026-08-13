@@ -1,0 +1,118 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'services/supabase_service.dart';
+import 'screens/auth_screen.dart';
+import 'screens/home_screen.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    await dotenv.load(fileName: '.env');
+    await SupabaseService.initialize();
+  } catch (e) {
+    debugPrint('Initialization error: $e');
+  }
+
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Color(0xFF005B41),
+      statusBarIconBrightness: Brightness.light,
+    ),
+  );
+
+  runApp(const SyriaMarketApp());
+}
+
+class SyriaMarketApp extends StatelessWidget {
+  const SyriaMarketApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'سوق سوريا الشامل',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        fontFamily: 'Cairo',
+        scaffoldBackgroundColor: const Color(0xFFF4F6F8),
+        primaryColor: const Color(0xFF005B41),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF005B41),
+          primary: const Color(0xFF005B41),
+          secondary: const Color(0xFFFF9800),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF005B41),
+          foregroundColor: Colors.white,
+          centerTitle: true,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF005B41),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+      ),
+      home: const Directionality(
+        textDirection: TextDirection.rtl,
+        child: AuthWrapper(),
+      ),
+    );
+  }
+}
+
+class AuthWrapper extends StatefulWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  bool _isLoading = true;
+  bool _isLoggedIn = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuth();
+    SupabaseService.client.auth.onAuthStateChange.listen((data) {
+      final session = data.session;
+      if (mounted) {
+        setState(() {
+          _isLoggedIn = session != null;
+        });
+      }
+    });
+  }
+
+  void _checkAuth() async {
+    final session = SupabaseService.client.auth.currentSession;
+    if (mounted) {
+      setState(() {
+        _isLoggedIn = session != null;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator(color: Color(0xFF005B41))),
+      );
+    }
+
+    if (!_isLoggedIn) {
+      return const AuthScreen();
+    }
+
+    return const HomeScreen();
+  }
+}

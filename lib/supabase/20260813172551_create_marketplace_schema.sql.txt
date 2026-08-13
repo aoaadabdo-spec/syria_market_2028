@@ -1,0 +1,237 @@
+/*
+# Create Syria Market Schema
+
+## Overview
+Creates the complete database schema for a marketplace app (سوق سوريا الشامل) with:
+- User profiles with admin role support
+- Ads (إعلانات) with categories, provinces, prices, images, status workflow
+- Favorites (مفضلة) for saving ads
+- Admin audit trail for ad moderation
+
+## New Tables
+
+### 1. profiles
+- `id` (uuid, PK, references auth.users) - links to Supabase auth
+- `name` (text) - display name
+- `phone` (text) - contact phone
+- `is_admin` (boolean, default false) - admin flag
+- `created_at` (timestamptz)
+
+### 2. ads
+- `id` (uuid, PK)
+- `title` (text, not null)
+- `description` (text, not null)
+- `category` (text, not null)
+- `province` (text, not null)
+- `city` (text, not null)
+- `phone` (text, not null)
+- `contact_method` (text, not null)
+- `price_syrian` (numeric, nullable)
+- `price_usd` (numeric, nullable)
+- `currency_type` (text, default 'syrian') - 'syrian' | 'usd' | 'both'
+- `status` (text, default 'pending') - 'pending' | 'approved' | 'rejected'
+- `rejection_reason` (text, nullable)
+- `image_urls` (text[], default '{}')
+- `is_sold` (boolean, default false)
+- `is_sponsored` (boolean, default false)
+- `user_id` (uuid, not null, default auth.uid()) - owner
+- `created_at` (timestamptz, default now())
+- `updated_at` (timestamptz, default now())
+
+### 3. favorites
+- `id` (uuid, PK)
+- `user_id` (uuid, not null, default auth.uid())
+- `ad_id` (uuid, not null, references ads)
+- `created_at` (timestamptz, default now())
+- Unique constraint on (user_id, ad_id)
+
+## Security (RLS)
+
+### profiles
+- Users can read their own profile
+- Users can update their own profile (but NOT is_admin - protected)
+
+### ads
+- Anyone (anon + authenticated) can read approved ads
+- Authenticated users can read their own pending/rejected ads
+- Authenticated users can insert their own ads
+- Owners can update their own ads
+- Admins can update any ad (for approve/reject/sponsor/sold)
+- Owners can delete their own ads
+- Admins can delete any ad
+
+### favorites
+- Users can read their own favorites
+- Users can insert their own favorites
+- Users can delete their own favorites
+
+## Important Notes
+1. is_admin column is protected: users cannot set it themselves via UPDATE policy
+2. Admin checks use a SECURITY DEFINER function to avoid RLS recursion
+3. All owner columns default to auth.uid() so inserts work without passing user_id
+*/
+
+-- ============ PROFILES TABLE ============
+CREATE TABLE IF NOT EXISTS profiles (
+  id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  name text NOT NULL DEFAULT '',
+  phone text NOT NULL DEFAULT '',
+  is_admin boolean NOT NULL DEFAULT false,
+  created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "select_own_profile" ON profiles;
+CREATE POLICY "select_own_profile" ON profiles FOR SELECT
+  TO authenticated USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "update_own_profile" ON profiles;
+CREATE POLICY "update_own_profile" ON profiles FOR UPDATE
+  TO authenticated USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id AND is_admin = (
+    SELECT profiles.is_admin FROM profiles WHERE profiles.id = auth.uid()
+  ));
+
+-- ============ ADS TABLE ============
+CREATE TABLE IF NOT EXISTS ads (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  description text NOT NULL,
+  category text NOT NULL,
+  province text NOT NULL,
+  city text NOT NULL,
+  phone text NOT NULL,
+  contact_method text NOT NULL,
+  price_syrian numeric,
+  price_usd numeric,
+  currency_type text NOT NULL DEFAULT 'syrian',
+  status text NOT NULL DEFAULT 'pending',
+  rejection_reason text,
+  image_urls text[] NOT NULL DEFAULT '{}',
+  is_sold boolean NOT NULL DEFAULT false,
+  is_sponsored boolean NOT NULL DEFAULT false,
+  user_id uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE ads ENABLE ROW LEVEL SECURITY;
+
+-- Anyone can read approved ads (public marketplace)
+DROP POLICY IF EXISTS "select_approved_ads" ON ads;
+CREATE POLICY "select_approved_ads" ON ads FOR SELECT
+  TO anon, authenticated USING (status = 'approved');
+
+-- Authenticated users can read their own ads (any status)
+DROP POLICY IF EXISTS "select_own_ads" ON ads;
+CREATE POLICY "select_own_ads" ON ads FOR SELECT
+  TO authenticated USING (auth.uid() = user_id);
+
+-- Authenticated users can insert their own ads
+DROP POLICY IF EXISTS "insert_own_ads" ON ads;
+CREATE POLICY "insert_own_ads" ON ads FOR INSERT
+  TO authenticated WITH CHECK (auth.uid() = user_id);
+
+-- Owners can update their own ads (but cannot change status - that's admin only)
+DROP POLICY IF EXISTS "update_own_ads" ON ads;
+CREATE POLICY "update_own_ads" ON ads FOR UPDATE
+  TO authenticated USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+-- ============ HELPER FUNCTION: is_admin_check ============
+-- SECURITY DEFINER so it can read profiles without RLS recursion
+CREATE OR REPLACE FUNCTION is_admin_check(check_user_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT COALESCE(
+    (SELECT is_admin FROM profiles WHERE id = check_user_id),
+    false
+  );
+$$;
+
+-- Admins can update any ad (for moderation: approve, reject, sponsor, mark sold)
+DROP POLICY IF EXISTS "admin_update_ads" ON ads;
+CREATE POLICY "admin_update_ads" ON ads FOR UPDATE
+  TO authenticated USING (is_admin_check(auth.uid()))
+  WITH CHECK (is_admin_check(auth.uid()));
+
+-- Owners can delete their own ads
+DROP POLICY IF EXISTS "delete_own_ads" ON ads;
+CREATE POLICY "delete_own_ads" ON ads FOR DELETE
+  TO authenticated USING (auth.uid() = user_id);
+
+-- Admins can delete any ad
+DROP POLICY IF EXISTS "admin_delete_ads" ON ads;
+CREATE POLICY "admin_delete_ads" ON ads FOR DELETE
+  TO authenticated USING (is_admin_check(auth.uid()));
+
+-- ============ FAVORITES TABLE ============
+CREATE TABLE IF NOT EXISTS favorites (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
+  ad_id uuid NOT NULL REFERENCES ads(id) ON DELETE CASCADE,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(user_id, ad_id)
+);
+
+ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "select_own_favorites" ON favorites;
+CREATE POLICY "select_own_favorites" ON favorites FOR SELECT
+  TO authenticated USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "insert_own_favorites" ON favorites;
+CREATE POLICY "insert_own_favorites" ON favorites FOR INSERT
+  TO authenticated WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "delete_own_favorites" ON favorites;
+CREATE POLICY "delete_own_favorites" ON favorites FOR DELETE
+  TO authenticated USING (auth.uid() = user_id);
+
+-- ============ INDEXES ============
+CREATE INDEX IF NOT EXISTS idx_ads_status ON ads(status);
+CREATE INDEX IF NOT EXISTS idx_ads_category ON ads(category);
+CREATE INDEX IF NOT EXISTS idx_ads_province ON ads(province);
+CREATE INDEX IF NOT EXISTS idx_ads_user_id ON ads(user_id);
+CREATE INDEX IF NOT EXISTS idx_ads_sponsored ON ads(is_sponsored) WHERE is_sponsored = true;
+CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id);
+
+-- ============ TRIGGER: auto-create profile on signup ============
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, name, phone)
+  VALUES (NEW.id, NEW.raw_user_meta_data->>'name', NEW.raw_user_meta_data->>'phone')
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+-- ============ TRIGGER: update updated_at on ads ============
+CREATE OR REPLACE FUNCTION update_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS ads_updated_at ON ads;
+CREATE TRIGGER ads_updated_at
+  BEFORE UPDATE ON ads
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();

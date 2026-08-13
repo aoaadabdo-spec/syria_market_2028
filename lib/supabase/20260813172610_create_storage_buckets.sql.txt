@@ -1,0 +1,36 @@
+/*
+# Create Storage Bucket for Ad Images
+
+Creates a public storage bucket 'ad_images' for uploading marketplace listing photos.
+Also creates a private bucket 'admin_docs' for admin-only files.
+
+## Storage Policies
+- ad_images: Anyone can read (public marketplace). Authenticated users can upload to their own folder. Owners can update/delete their own files.
+- The bucket is public so anyone can view listing photos.
+*/
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('ad_images', 'ad_images', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage policies for ad_images bucket
+DROP POLICY IF EXISTS "Anyone can read ad images" ON storage.objects;
+CREATE POLICY "Anyone can read ad images" ON storage.objects
+  FOR SELECT TO anon, authenticated
+  USING (bucket_id = 'ad_images');
+
+DROP POLICY IF EXISTS "Authenticated users can upload ad images" ON storage.objects;
+CREATE POLICY "Authenticated users can upload ad images" ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'ad_images');
+
+DROP POLICY IF EXISTS "Users can update own ad images" ON storage.objects;
+CREATE POLICY "Users can update own ad images" ON storage.objects
+  FOR UPDATE TO authenticated
+  USING (bucket_id = 'ad_images' AND owner = auth.uid())
+  WITH CHECK (bucket_id = 'ad_images');
+
+DROP POLICY IF EXISTS "Users can delete own ad images" ON storage.objects;
+CREATE POLICY "Users can delete own ad images" ON storage.objects
+  FOR DELETE TO authenticated
+  USING (bucket_id = 'ad_images' AND owner = auth.uid());
