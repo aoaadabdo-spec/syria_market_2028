@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "320069813197",
+    "project_id": "syriamarket-d01af",
+    "storage_bucket": "syriamarket-d01af.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:320069813197:android:9166ab241cde77a805ba84",
+        "android_client_info": {
+          "package_name": "com.syria.market.fresh"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA44eAetyPP6e_FE4g-rAcoSHzA9_M2rnQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:320069813197:android:b95103b86fd96a3405ba84",
+        "android_client_info": {
+          "package_name": "com.syria.market.syria_market"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA44eAetyPP6e_FE4g-rAcoSHzA9_M2rnQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
