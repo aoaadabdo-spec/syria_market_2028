@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../services/supabase_service.dart';
 import '../models/ad_model.dart';
 import 'ad_detail_screen.dart';
@@ -29,19 +29,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           maxLines: 3,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('إلغاء')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
               if (reasonController.text.trim().isNotEmpty) {
                 try {
-                  await SupabaseService.client
-                      .from('ads')
-                      .update({
-                        'status': 'rejected',
-                        'rejection_reason': reasonController.text.trim(),
-                      })
-                      .eq('id', ad.id);
+                  await SupabaseService.client.from('ads').update({
+                    'status': 'rejected',
+                    'rejection_reason': reasonController.text.trim(),
+                  }).eq('id', ad.id);
 
                   if (mounted) {
                     Navigator.pop(context);
@@ -52,7 +51,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+                      SnackBar(
+                          content: Text('خطأ: $e'),
+                          backgroundColor: Colors.red),
                     );
                   }
                 }
@@ -62,7 +63,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 );
               }
             },
-            child: const Text('تأكيد الرفض', style: TextStyle(color: Colors.white)),
+            child: const Text('تأكيد الرفض',
+                style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -74,8 +76,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     try {
       await SupabaseService.client
           .from('ads')
-          .update({'status': 'approved'})
-          .eq('id', ad.id);
+          .update({'status': 'approved'}).eq('id', ad.id);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -98,7 +99,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         title: const Text('حذف الإعلان'),
         content: const Text('هل أنت متأكد؟'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
@@ -178,9 +181,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ],
           ),
           Expanded(
-            child: _activeTab == 0
-                ? _buildPendingAds()
-                : _buildAllAds(),
+            child: _activeTab == 0 ? _buildPendingAds() : _buildAllAds(),
           ),
         ],
       ),
@@ -196,7 +197,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           .order('created_at', ascending: false),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator(color: Color(0xFF005B41)));
+          return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF005B41)));
         }
 
         final pendingAds = snapshot.data!
@@ -237,10 +239,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             children: [
                               Text(ad.title,
                                   style: const TextStyle(
-                                      fontWeight: FontWeight.bold, fontSize: 16)),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16)),
                               const SizedBox(height: 4),
-                              Text('القسم: ${ad.category} | ${ad.province} (${ad.city})'),
-                              Text('التواصل: ${ad.contactMethod} - ${ad.phone}'),
+                              Text(
+                                  'القسم: ${ad.category} | ${ad.province} (${ad.city})'),
+                              Text(
+                                  'التواصل: ${ad.contactMethod} - ${ad.phone}'),
                               const SizedBox(height: 4),
                               Text(ad.description,
                                   style: const TextStyle(fontSize: 13)),
@@ -252,12 +257,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           borderRadius: BorderRadius.circular(8),
                           child: ad.imageUrls.isNotEmpty
                               ? Image.network(ad.imageUrls.first,
-                                  width: 75, height: 75, fit: BoxFit.cover,
+                                  width: 75,
+                                  height: 75,
+                                  fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) =>
-                                      Container(width: 75, height: 75, color: Colors.grey))
+                                      Container(
+                                          width: 75,
+                                          height: 75,
+                                          color: Colors.grey))
                               : Container(
-                                  width: 75, height: 75, color: Colors.grey.shade300,
-                                  child: const Icon(Icons.image, color: Colors.grey)),
+                                  width: 75,
+                                  height: 75,
+                                  color: Colors.grey.shade300,
+                                  child: const Icon(Icons.image,
+                                      color: Colors.grey)),
                         ),
                       ],
                     ),
@@ -266,24 +279,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green),
                           onPressed: () => _approveAd(ad),
                           icon: const Icon(Icons.check, color: Colors.white),
-                          label: const Text('موافقة', style: TextStyle(color: Colors.white)),
+                          label: const Text('موافقة',
+                              style: TextStyle(color: Colors.white)),
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red),
                           onPressed: () => _showRejectDialog(ad),
                           icon: const Icon(Icons.close, color: Colors.white),
-                          label: const Text('رفض', style: TextStyle(color: Colors.white)),
+                          label: const Text('رفض',
+                              style: TextStyle(color: Colors.white)),
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey),
                           onPressed: () => _openAdDetail(ad),
-                          icon: const Icon(Icons.visibility, color: Colors.white),
-                          label: const Text('عرض', style: TextStyle(color: Colors.white)),
+                          icon:
+                              const Icon(Icons.visibility, color: Colors.white),
+                          label: const Text('عرض',
+                              style: TextStyle(color: Colors.white)),
                         ),
                       ],
                     ),
@@ -301,11 +321,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: SupabaseService.client
           .from('ads')
-          .stream(primaryKey: ['id'])
-          .order('created_at', ascending: false),
+          .stream(primaryKey: ['id']).order('created_at', ascending: false),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator(color: Color(0xFF005B41)));
+          return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF005B41)));
         }
 
         final allAds = snapshot.data!
